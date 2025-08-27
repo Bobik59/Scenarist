@@ -1,0 +1,140 @@
+@page "/create/block"
+@inject ScriptApp.Services.ScriptService ScriptService
+@using ScriptApp.Models
+@using Microsoft.AspNetCore.Components.Web
+@inject IJSRuntime JS
+
+<div class="container mt-4">
+    <div class="card shadow-sm">
+        <div class="card-header bg-primary text-white">
+            <h4 class="mb-0">📦 Создание сценария (блочный режим)</h4>
+        </div>
+
+        <div class="card-body">
+            <input @bind="Title" placeholder="Название сценария"
+                   class="form-control mb-3" />
+
+            <div class="border rounded bg-light"
+                 @ref="ContainerRef"
+                 @onmousedown="StartDraw"
+                 @onmousemove="Draw"
+                 @onmouseup="EndDraw"
+                 style="position: relative; width: 100%; height: 600px; overflow: hidden;">
+
+                @foreach (var block in Blocks)
+                {
+                    <div class="shadow-sm"
+                         style="position: absolute; left:@block.Xpx; top:@block.Ypx; 
+                                width:@block.Widthpx; height:@block.Heightpx; 
+                                border:1px solid #555; background:white; border-radius:6px;">
+
+                        <textarea class="form-control"
+                                  style="width:100%; height:100%; resize:none; border:none; outline:none;"
+                                  @bind="block.Content"
+                                  @onmousedown:stopPropagation="true"></textarea>
+                    </div>
+                }
+
+                @if (IsDrawing)
+                {
+                    <div style="position: absolute; left:@CurrentXpx; top:@CurrentYpx; 
+                                width:@CurrentWidthpx; height:@CurrentHeightpx; 
+                                border:2px dashed red; border-radius:6px;">
+                    </div>
+                }
+            </div>
+
+            <button class="btn btn-success mt-3" @onclick="SaveScript">
+                💾 Сохранить сценарий
+            </button>
+
+            @if (!string.IsNullOrEmpty(Link))
+            {
+                <div class="alert alert-info mt-3">
+                    Ссылка для просмотра: <a href="@Link">@Link</a>
+                </div>
+            }
+        </div>
+    </div>
+</div>
+
+@code {
+    private string Title = "";
+    private List<Block> Blocks = new();
+    private bool IsDrawing = false;
+    private int StartX, StartY, CurrentX, CurrentY, CurrentWidth, CurrentHeight;
+    private string? Link;
+
+    private ElementReference ContainerRef;
+    private double ContainerLeft, ContainerTop;
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            var rect = await JS.InvokeAsync<BoundingClientRect>("getBoundingClientRect", ContainerRef);
+            ContainerLeft = rect.Left;
+            ContainerTop = rect.Top;
+        }
+    }
+
+    void StartDraw(MouseEventArgs e)
+    {
+        int clickX = (int)(e.ClientX - ContainerLeft);
+        int clickY = (int)(e.ClientY - ContainerTop);
+
+        // Проверяем, попали ли в существующий блок
+        foreach (var block in Blocks)
+        {
+            if (clickX >= block.X && clickX <= block.X + block.Width &&
+                clickY >= block.Y && clickY <= block.Y + block.Height)
+            {
+                return; // клик по блоку — не начинаем рисование
+            }
+        }
+
+        // Клик по пустому месту — начинаем рисовать
+        IsDrawing = true;
+        StartX = clickX;
+        StartY = clickY;
+    }
+
+    void Draw(MouseEventArgs e)
+    {
+        if (!IsDrawing) return;
+
+        CurrentX = (int)Math.Min(StartX, e.ClientX - ContainerLeft);
+        CurrentY = (int)Math.Min(StartY, e.ClientY - ContainerTop);
+        CurrentWidth = (int)Math.Abs((e.ClientX - ContainerLeft) - StartX);
+        CurrentHeight = (int)Math.Abs((e.ClientY - ContainerTop) - StartY);
+    }
+
+    void EndDraw(MouseEventArgs e)
+    {
+        if (!IsDrawing) return;
+        IsDrawing = false;
+
+        // Минимальный размер
+        if (CurrentWidth > 10 && CurrentHeight > 10)
+        {
+            Blocks.Add(new Block
+            {
+                X = CurrentX,
+                Y = CurrentY,
+                Width = CurrentWidth,
+                Height = CurrentHeight
+            });
+        }
+    }
+
+    void SaveScript()
+    {
+        var script = ScriptService.AddScript(Title, Blocks);
+        Link = $"/script/{script.Id}";
+    }
+
+    private string CurrentXpx => $"{CurrentX}px";
+    private string CurrentYpx => $"{CurrentY}px";
+    private string CurrentWidthpx => $"{CurrentWidth}px";
+    private string CurrentHeightpx => $"{CurrentHeight}px";
+}

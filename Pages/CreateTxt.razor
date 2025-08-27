@@ -1,0 +1,49 @@
+@page "/create/txt"
+@using ScriptApp.Services
+@inject ScriptService ScriptService
+
+<div class="container mt-4">
+    <div class="card shadow-sm">
+        <div class="card-header bg-primary text-white">
+            <h4 class="mb-0">📝 Создать сценарий (текстовый режим)</h4>
+        </div>
+        <div class="card-body">
+            <div class="mb-3">
+                <label class="form-label">Название сценария</label>
+                <input class="form-control"
+                       placeholder="Введите название"
+                       @bind="title" />
+            </div>
+
+            <div class="mb-3">
+                <label class="form-label">Текст сценария</label>
+                <textarea class="form-control"
+                          style="height: 300px; resize: none;"
+                          placeholder="Введите текст..."
+                          @bind="textContent"></textarea>
+            </div>
+
+            <button class="btn btn-success" @onclick="SaveText">💾 Сохранить</button>
+
+            @if (!string.IsNullOrEmpty(link))
+            {
+                <div class="alert alert-info mt-3">
+                    ✅ Сценарий сохранён!  
+                    Ссылка для просмотра: <a href="@link">@link</a>
+                </div>
+            }
+        </div>
+    </div>
+</div>
+
+@code {
+    private string title = "";
+    private string textContent = "";
+    private string? link;
+
+    private void SaveText()
+    {
+        var script = ScriptService.AddTextScript(title, textContent);
+        link = $"/script/{script.Id}";
+    }
+}
